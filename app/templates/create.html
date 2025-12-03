@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Create{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">최신 패션을 추천해 드립니다</h1>
+
+    <div class="card p-4">
+        <form id="style-form">
+            <div class="mb-3">
+                <label for="style-text" class="form-label">무엇이 궁금하세요?</label>
+                <textarea class="form-control" id="style-text" name="text" rows="5" placeholder="만들고 싶은 스타일에 대해 자세히 설명해주세요." required></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="style-image" class="form-label">이미지 첨부 (선택 사항)</label>
+                <input class="form-control" type="file" id="style-image" name="image" accept="image/*">
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">실행</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="result-container" class="mt-4">
+        <h2 class="mb-3">결과</h2>
+        <div class="card">
+            <div id="result-output" class="card-body result-output-box">
+                아직 실행 결과가 없습니다.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('style-form').addEventListener('submit', async function(event) {
+        event.preventDefault(); // 기본 폼 제출 방지
+
+        const form = event.target;
+        const formData = new FormData(form);
+        const webhookUrl = 'http://localhost:5678/webhook/c6ebe062-d352-491d-8da3-a5fe2d3f6949';
+        const resultOutput = document.getElementById('result-output');
+
+        resultOutput.textContent = '웹훅으로 데이터를 보내는 중...';
+
+        const b64toBlob = (b64Data, contentType = '', sliceSize = 512) => {
+            const byteCharacters = atob(b64Data);
+            const byteArrays = [];
+            for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+                const slice = byteCharacters.slice(offset, offset + sliceSize);
+                const byteNumbers = new Array(slice.length);
+                for (let i = 0; i < slice.length; i++) {
+                    byteNumbers[i] = slice.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                byteArrays.push(byteArray);
+            }
+            return new Blob(byteArrays, { type: contentType });
+        };
+
+        try {
+            // 1. Get JSON response from n8n webhook
+            const n8nResponse = await fetch(webhookUrl, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!n8nResponse.ok) {
+                throw new Error(`Webhook error! status: ${n8nResponse.status}`);
+            }
+
+            const result = await n8nResponse.json();
+
+            resultOutput.textContent = '이미지 데이터를 처리하는 중...';
+            
+            // 2. Extract base64 data and mimeType from the JSON response
+            let mediaBlob, mimeType;
+            if (result.candidates && result.candidates.length > 0) {
+                const inlineDataPart = result.candidates[0].content.parts.find(p => p.inlineData);
+                if (!inlineDataPart) throw new Error("JSON 응답에서 'inlineData'를 찾을 수 없습니다.");
+                
+                const inlineData = inlineDataPart.inlineData;
+                mimeType = inlineData.mimeType;
+                mediaBlob = b64toBlob(inlineData.data, mimeType);
+            } else {
+                console.log("Unexpected JSON response from webhook:", result);
+                throw new Error("지원하지 않는 JSON 응답 형식입니다. (자세한 내용은 브라우저 개발자 콘솔을 확인하세요)");
+            }
+
+            // 3. Upload the created blob to our backend
+            const uploadFormData = new FormData();
+            const promptText = document.getElementById('style-text').value;
+            uploadFormData.append('file', mediaBlob, `upload.${mimeType.split('/')[1]}`);
+            uploadFormData.append('prompt', promptText);
+
+            resultOutput.textContent = '결과 파일을 서버에 업로드하는 중...';
+
+            const uploadResponse = await fetch('/api/creations/upload', {
+                method: 'POST',
+                body: uploadFormData
+            });
+
+            if (!uploadResponse.ok) {
+                const errorText = await uploadResponse.text();
+                throw new Error(`Server upload failed: ${errorText}`);
+            }
+            
+            const newCreation = await uploadResponse.json();
+
+            // 4. Display the result from our backend
+            resultOutput.innerHTML = ''; // Clear loading text
+            
+            const contentWrapper = document.createElement('div');
+            if (newCreation.media_type === 'image') {
+                const img = document.createElement('img');
+                img.src = newCreation.media_url;
+                img.alt = newCreation.prompt;
+                img.className = 'img-fluid';
+                contentWrapper.appendChild(img);
+            } else if (newCreation.media_type === 'video') {
+                const video = document.createElement('video');
+                video.src = newCreation.media_url;
+                video.controls = true;
+                video.className = 'img-fluid';
+                contentWrapper.appendChild(video);
+            }
+            resultOutput.appendChild(contentWrapper);
+
+        } catch (error) {
+            console.error('Error in creation process:', error);
+            resultOutput.textContent = `오류가 발생했습니다: ${error.message}`;
+        }
+    });
+</script>
+{% endblock %}
