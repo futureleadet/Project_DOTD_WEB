@@ -14,6 +14,28 @@
             </div>
 
             <div class="mb-3">
+                <label for="gender-select" class="form-label">성별</label>
+                <select class="form-select" id="gender-select" name="gender">
+                    <option value="">선택 안 함</option>
+                    <option value="male">남성</option>
+                    <option value="female">여성</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="age-select" class="form-label">연령대</label>
+                <select class="form-select" id="age-select" name="age_group">
+                    <option value="">선택 안 함</option>
+                    <option value="10s">10대</option>
+                    <option value="20s">20대</option>
+                    <option value="30s">30대</option>
+                    <option value="40s">40대</option>
+                    <option value="50s">50대</option>
+                    <option value="60s+">60대 이상</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
                 <label for="style-image" class="form-label">이미지 첨부 (선택 사항)</label>
                 <input class="form-control" type="file" id="style-image" name="image" accept="image/*">
             </div>
@@ -40,6 +62,14 @@
 
         const form = event.target;
         const formData = new FormData(form);
+
+        // Get file mime type and add to formData if file exists
+        const fileInput = document.getElementById('style-image');
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            formData.append('image_mime_type', file.type);
+        }
+
         const webhookUrl = 'http://localhost:5678/webhook/c6ebe062-d352-491d-8da3-a5fe2d3f6949';
         const resultOutput = document.getElementById('result-output');
 
@@ -72,47 +102,52 @@
             }
 
             const result = await n8nResponse.json();
+            console.log('n8n webhook parsed JSON result:', result);
 
-            resultOutput.textContent = '이미지 데이터를 처리하는 중...';
-            
-            // 2. Extract base64 data and mimeType from the JSON response
-            let mediaBlob, mimeType;
+            let newCreation; // Variable to hold the final creation data from our backend
+            const promptText = document.getElementById('style-text').value; // Get original prompt early
+
+            // --- Logic to handle different webhook response formats (now only Base64 expected) ---
             if (result.candidates && result.candidates.length > 0) {
+                // Old Base64 format: { "candidates": [ { "content": { "parts": [ { "inlineData": { "data": "base64" } } ] } } ] }
+                resultOutput.textContent = '이미지 데이터를 처리하는 중...';
+                
                 const inlineDataPart = result.candidates[0].content.parts.find(p => p.inlineData);
                 if (!inlineDataPart) throw new Error("JSON 응답에서 'inlineData'를 찾을 수 없습니다.");
                 
                 const inlineData = inlineDataPart.inlineData;
-                mimeType = inlineData.mimeType;
-                mediaBlob = b64toBlob(inlineData.data, mimeType);
+                const mimeType = inlineData.mimeType;
+                const mediaBlob = b64toBlob(inlineData.data, mimeType);
+
+                // Upload the created blob to our original backend endpoint
+                const uploadFormData = new FormData();
+                uploadFormData.append('file', mediaBlob, `upload.${mimeType.split('/')[1]}`);
+                uploadFormData.append('prompt', promptText); // This prompt is for the old API
+
+                resultOutput.textContent = '결과 파일을 서버에 업로드하는 중...';
+
+                const uploadResponse = await fetch('/api/creations/upload', {
+                    method: 'POST',
+                    body: uploadFormData
+                });
+
+                if (!uploadResponse.ok) {
+                    const errorText = await uploadResponse.text();
+                    throw new Error(`Server upload failed (Base64): ${errorText}`);
+                }
+                newCreation = await uploadResponse.json();
+
             } else {
+                // Unknown format
                 console.log("Unexpected JSON response from webhook:", result);
-                throw new Error("지원하지 않는 JSON 응답 형식입니다. (자세한 내용은 브라우저 개발자 콘솔을 확인하세요)");
+                throw new Error("지원하지 않는 웹훅 응답 형식입니다.");
             }
-
-            // 3. Upload the created blob to our backend
-            const uploadFormData = new FormData();
-            const promptText = document.getElementById('style-text').value;
-            uploadFormData.append('file', mediaBlob, `upload.${mimeType.split('/')[1]}`);
-            uploadFormData.append('prompt', promptText);
-
-            resultOutput.textContent = '결과 파일을 서버에 업로드하는 중...';
-
-            const uploadResponse = await fetch('/api/creations/upload', {
-                method: 'POST',
-                body: uploadFormData
-            });
-
-            if (!uploadResponse.ok) {
-                const errorText = await uploadResponse.text();
-                throw new Error(`Server upload failed: ${errorText}`);
-            }
-            
-            const newCreation = await uploadResponse.json();
 
             // 4. Display the result from our backend
             resultOutput.innerHTML = ''; // Clear loading text
             
             const contentWrapper = document.createElement('div');
+            // Display logic simplified to just use newCreation data
             if (newCreation.media_type === 'image') {
                 const img = document.createElement('img');
                 img.src = newCreation.media_url;

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOTD Prompt Generator Test UI</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #0a0a0a; /* 컴포넌트 배경색과 일치 */
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; /* 컴포넌트 폰트와 일치 */
+        }
+        /* DOTD_prompt_generator_ui.jsx에 포함된 스타일 애니메이션 키프레임도 전역으로 적용 */
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        * { box-sizing: border-box; }
+        button { font-family: inherit; }
+        textarea::placeholder { color: rgba(255,255,255,0.4); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+// 페르소나별 데이터
+const PERSONAS = {
+  beginner: {
+    id: 'beginner',
+    name: '패션 초보자',
+    emoji: '👶',
+    tagline: '"뭘 입어야 덜 어색해 보일까?"',
+    color: '#4ECDC4',
+    gradient: 'linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%)',
+    description: '기본템으로 실패 없는 스타일링',
+    situations: [
+      { id: 'work', label: '출근/회의', icon: '💼' },
+      { id: 'casual', label: '일상/캐주얼', icon: '☕' },
+      { id: 'date', label: '소개팅/약속', icon: '💕' },
+      { id: 'interview', label: '면접', icon: '📋' },
+      { id: 'wedding', label: '결혼식 하객', icon: '💒' },
+      { id: 'family', label: '가족모임', icon: '👨‍👩‍👧' },
+    ],
+    bodyTypes: [
+      { id: 'slim', label: '마른 체형' },
+      { id: 'standard', label: '보통 체형' },
+      { id: 'muscular', label: '근육질' },
+      { id: 'curvy', label: '통통한 체형' },
+    ],
+    concerns: [
+      { id: 'shoulder', label: '어깨가 좁아요' },
+      { id: 'belly', label: '뱃살 커버' },
+      { id: 'legs', label: '다리가 짧아 보여요' },
+      { id: 'basic', label: '기본템 조합을 모르겠어요' },
+      { id: 'color', label: '색 매칭이 어려워요' },
+    ],
+    styleGoal: '깔끔하고 무난하게',
+    promptStyle: 'warm, approachable, lifestyle'
+  },
+  ootd: {
+    id: 'ootd',
+    name: 'OOTD 중심',
+    emoji: '👔',
+    tagline: '"오늘은 어떤 무드로 보이고 싶을까?"',
+    color: '#FF6B9D',
+    gradient: 'linear-gradient(135deg, #FF6B9D 0%, #C44FE2 100%)',
+    description: '매일 다른 스타일, 인스타 감성',
+    situations: [
+      { id: 'cafe', label: '카페/브런치', icon: '🥐' },
+      { id: 'street', label: '거리/스트릿', icon: '🚶' },
+      { id: 'office', label: '출근룩', icon: '🏢' },
+      { id: 'date', label: '데이트', icon: '💗' },
+      { id: 'travel', label: '여행', icon: '✈️' },
+      { id: 'party', label: '파티/모임', icon: '🎉' },
+    ],
+    moods: [
+      { id: 'minimal', label: '미니멀', emoji: '⬜' },
+      { id: 'casual', label: '캐주얼', emoji: '😎' },
+      { id: 'elegant', label: '우아한', emoji: '✨' },
+      { id: 'street', label: '스트릿', emoji: '🛹' },
+      { id: 'romantic', label: '로맨틱', emoji: '🌸' },
+      { id: 'chic', label: '시크', emoji: '🖤' },
+    ],
+    colorVibes: [
+      { id: 'warm', label: '웜톤', color: '#E8985E' },
+      { id: 'cool', label: '쿨톤', color: '#7B9ED9' },
+      { id: 'neutral', label: '뉴트럴', color: '#C4B8A5' },
+      { id: 'bold', label: '비비드', color: '#FF4757' },
+      { id: 'pastel', label: '파스텔', color: '#DDA0DD' },
+      { id: 'mono', label: '모노톤', color: '#4A4A4A' },
+    ],
+    styleGoal: '트렌디하고 인스타그래머블',
+    promptStyle: 'stylish, instagram-worthy, trendy'
+  },
+  trendsetter: {
+    id: 'trendsetter',
+    name: '트렌드세터',
+    emoji: '💎',
+    tagline: '"트렌드를 따르지 않고, 만든다"',
+    color: '#1a1a1a',
+    gradient: 'linear-gradient(135deg, #1a1a1a 0%, #434343 100%)',
+    description: '하이패션, 에디토리얼 무드',
+    situations: [
+      { id: 'editorial', label: '에디토리얼', icon: '📸' },
+      { id: 'runway', label: '런웨이 무드', icon: '👠' },
+      { id: 'gallery', label: '갤러리/전시', icon: '🖼️' },
+      { id: 'rooftop', label: '루프탑/야경', icon: '🌃' },
+      { id: 'street', label: '하이 스트릿', icon: '🏙️' },
+      { id: 'concept', label: '컨셉추얼', icon: '🎭' },
+    ],
+    trendKeywords: [
+      { id: 'oversize', label: '오버사이즈' },
+      { id: 'layering', label: '레이어링' },
+      { id: 'quietlux', label: '조용한 럭셔리' },
+      { id: 'avantgarde', label: '아방가르드' },
+      { id: 'deconstructed', label: '해체주의' },
+      { id: 'retrofuture', label: '레트로퓨처' },
+    ],
+    editorialMoods: [
+      { id: 'vogue', label: 'Vogue', desc: '클래식 에디토리얼' },
+      { id: 'id', label: 'i-D', desc: '실험적/아방가르드' },
+      { id: 'wmagazine', label: 'W', desc: '드라마틱/아트' },
+      { id: 'dazed', label: 'Dazed', desc: '서브컬처/엣지' },
+    ],
+    styleGoal: '패션 포워드, 경계를 넘는',
+    promptStyle: 'high-fashion, editorial, dramatic'
+  }
+};
+
+// 날씨 옵션
+const WEATHER_OPTIONS = [
+  { id: 'sunny', label: '맑음', icon: '☀️', temp: '따뜻함' },
+  { id: 'cloudy', label: '흐림', icon: '☁️', temp: '선선함' },
+  { id: 'rainy', label: '비', icon: '🌧️', temp: '습함' },
+  { id: 'cold', label: '추움', icon: '❄️', temp: '쌀쌀함' },
+  { id: 'hot', label: '더움', icon: '🔥', temp: '더움' },
+];
+
+// 생성 타입
+const OUTPUT_TYPES = [
+  { id: 'images', label: '이미지 3장', icon: '🖼️', desc: '다양한 앵글의 착장 이미지' },
+  { id: 'video', label: '8초 영상', icon: '🎬', desc: '다이나믹한 OOTD 영상' },
+  { id: 'both', label: '이미지 + 영상', icon: '✨', desc: '풀 패키지' },
+];
+
+function DOTDPromptGenerator() {
+  const [step, setStep] = React.useState(0);
+  const [selectedPersona, setSelectedPersona] = React.useState(null);
+  const [userInputs, setUserInputs] = React.useState({
+    situation: null,
+    mood: null,
+    weather: null,
+    bodyType: null,
+    concerns: [],
+    colorVibe: null,
+    trendKeyword: null,
+    editorialMood: null,
+    freeText: '',
+    outputType: 'both',
+  });
+  const [generatedPrompt, setGeneratedPrompt] = React.useState(null);
+  const [isGenerating, setIsGenerating] = React.useState(false);
+
+  const getSteps = () => {
+    if (!selectedPersona) return ['페르소나 선택'];
+    
+    const baseSteps = ['페르소나 선택', '상황 선택', '날씨'];
+    
+    if (selectedPersona.id === 'beginner') {
+      return [...baseSteps, '체형 & 고민', '출력 타입', '프롬프트 생성'];
+    } else if (selectedPersona.id === 'ootd') {
+      return [...baseSteps, '무드 & 컬러', '출력 타입', '프롬프트 생성'];
+    } else {
+      return [...baseSteps, '트렌드 키워드', '에디토리얼 무드', '출력 타입', '프롬프트 생성'];
+    }
+  };
+
+  const steps = getSteps();
+
+  const generatePrompt = () => {
+    setIsGenerating(true);
+    
+    setTimeout(() => {
+      const prompt = buildPrompt();
+      setGeneratedPrompt(prompt);
+      setIsGenerating(false);
+    }, 1500);
+  };
+
+  const buildPrompt = () => {
+    const persona = selectedPersona;
+    const { situation, mood, weather, bodyType, concerns, colorVibe, trendKeyword, editorialMood, freeText } = userInputs;
+    
+    const situationLabel = persona.situations?.find(s => s.id === situation)?.label || '';
+    const weatherLabel = WEATHER_OPTIONS.find(w => w.id === weather)?.label || '';
+    
+    if (persona.id === 'beginner') {
+      return {
+        korean: {
+          image: `[유저_얼굴_이미지] ${situationLabel} 상황에 어울리는 깔끔한 기본 코디를 입은 한국 [남성/여성], ${bodyType === 'slim' ? '마른 체형을 보완하는' : bodyType === 'curvy' ? '체형을 자연스럽게 커버하는' : '균형잡힌'} 실루엣의 의상, ${weatherLabel} 날씨에 맞는 레이어링, 자연스럽고 편안한 자세로 서있는, 친근한 미소의 부드러운 표정, 눈높이 전신샷, ${situationLabel === '출근/회의' ? '모던 오피스 로비' : situationLabel === '소개팅/약속' ? '밝은 카페 인테리어' : '깔끔한 도시 거리'} 배경, 부드러운 자연광, 웜 뉴트럴 컬러 팔레트, 얕은 심도 f/2.8, 프로페셔널 라이프스타일 사진, 8K 해상도, 단정하면서도 편안해 보이는 의상${freeText ? `, 추가 요청: ${freeText}` : ''}`,
+          video: `패션 입문자를 위한 8초 OOTD 영상, ${situationLabel} 상황에 맞는 실패 없는 기본 코디를 입은 한국 [남성/여성],
+
+[0-2초] 오프닝: 미디엄샷으로 시작, ${situationLabel === '출근/회의' ? '밝은 오피스 로비' : '깔끔한 카페 앞'}에 자연스럽게 서있는 피사체, 카메라 살짝 옆 보다가 눈 맞추며 부드러운 미소, 부드러운 아침 빛
+
+[2-5초] 움직임: 편안하고 자신감 있는 걸음으로 카메라 향해 자연스럽게 걷기, 의상 디테일 보이며 피스들이 어떻게 조화되는지 보여주기, ${weatherLabel === '추움' ? '코트 자연스럽게 여밈' : '미묘한 재킷 움직임'}, 한 손은 캐주얼하게 가방끈 조정하거나 커피컵 들기
+
+[5-7초] 멈춤 & 디테일: 무게 이동하며 잠시 멈춤, 카메라 부드럽게 전환하며 의상 조합 하이라이트, 자연스러운 제스처(옷깃 정리, 시계 확인), 조용한 자신감 보여주는 표정
+
+[7-8초] 클로징: 살짝 돌아 의상 측면 프로필 보여주기, 진심 어린 따뜻한 미소
+
+스타일: 라이프스타일 다큐 느낌, 따뜻하고 초대하는 컬러 그레이딩, 메시지:

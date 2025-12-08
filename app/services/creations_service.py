@@ -59,7 +59,7 @@ class CreationsService:
 
     async def delete_creation(self, conn: asyncpg.Connection, creation_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         """
-        Deletes a creation after verifying ownership and removing the associated file.
+        Deletes a creation after verifying ownership and removing the associated file if it's local.
         """
         # 1. Get the creation details
         creation_to_delete = await self.creations_repo.get_creation_by_id(conn, creation_id)
@@ -70,12 +70,13 @@ class CreationsService:
         if creation_to_delete["user_id"] != user_id:
             raise HTTPException(status_code=403, detail="Not authorized to delete this creation")
 
-        # 3. Delete the physical file
+        # 3. Delete the physical file only if it is a local file
         media_url = creation_to_delete["media_url"]
-        # Convert URL path to system file path: /static/uploads/file.png -> app/static/uploads/file.png
-        file_path = "app" + media_url
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        if media_url.startswith('/static/uploads/'):
+            # Convert URL path to system file path: /static/uploads/file.png -> app/static/uploads/file.png
+            file_path = "app" + media_url
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
         # 4. Delete the record from the database
         deleted_creation = await self.creations_repo.delete_creation_by_id(conn, creation_id)
