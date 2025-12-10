@@ -1,4 +1,3 @@
-
 services:
   # PostgreSQL with pgvector
   db_postgresql:
