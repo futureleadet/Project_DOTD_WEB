@@ -40,6 +40,12 @@ async def google_callback(code: str, request: Request, user_service: UserService
         picture = user_info.get("picture")
         
         user = await user_service.get_or_create_user(conn, email, name, picture)
+
+        if not user or not user["id"]:
+            raise HTTPException(
+                status_code=500, 
+                detail="Failed to retrieve or create user with a valid ID."
+            )
         
         # Create JWT
         jwt_token = create_access_token({
