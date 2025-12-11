@@ -42,7 +42,7 @@ class CreationsService:
         media_url = f"/static/uploads/{unique_filename}"
         
         # 5. Determine media type
-        media_type = 'video' if file.content_type.startswith('video') else 'image'
+        media_type = 'video' if file.content_type and file.content_type.startswith('video') else 'image'
         
         # 6. Save metadata to DB
         new_creation = await self.creations_repo.create_creation(

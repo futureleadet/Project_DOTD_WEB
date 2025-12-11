@@ -18,3 +18,7 @@ async def dashboard(request: Request, user: Optional[dict] = Depends(get_optiona
 @router.get("/create")
 async def create(request: Request, user: Optional[dict] = Depends(get_optional_user)):
     return templates.TemplateResponse("create.html", {"request": request, "user": user})
+
+@router.get("/result/{task_id}")
+async def get_result_page(request: Request, task_id: str, user: Optional[dict] = Depends(get_optional_user)):
+    return templates.TemplateResponse("result.html", {"request": request, "task_id": task_id, "user": user})
